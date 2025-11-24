@@ -1,10 +1,4 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["bdnd"]
-
-[tool.setuptools.package-data]
-"*" = ["*.md", "*.txt"]
 

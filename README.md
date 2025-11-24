@@ -2,6 +2,10 @@
 
 一个用于百度网盘API的Python客户端，支持通过pip安装并提供命令行工具。
 
+[![GitHub](https://img.shields.io/github/stars/Rookie-Package/bdnd?style=social)](https://github.com/Rookie-Package/bdnd)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI](https://img.shields.io/pypi/v/bdnd)](https://pypi.org/project/bdnd/)
+
 ## 功能特性
 
 - 📤 上传文件和目录到百度网盘
@@ -112,6 +116,8 @@ MIT License
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+项目地址: [https://github.com/Rookie-Package/bdnd](https://github.com/Rookie-Package/bdnd)
 
 ## 更新日志
 

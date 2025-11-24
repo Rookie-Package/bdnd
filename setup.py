@@ -17,9 +17,9 @@ setup(
     description="Baidu Netdisk Client - A Python client for Baidu Netdisk API with CLI support",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    author="Your Name",
-    author_email="your.email@example.com",
-    url="https://github.com/yourusername/bdnd",
+    author="Rookie",
+    author_email="RookieEmail@163.com",
+    url="https://github.com/Rookie-Package/bdnd",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -49,8 +49,9 @@ setup(
     },
     keywords="baidu netdisk api client cli upload download",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/bdnd/issues",
-        "Source": "https://github.com/yourusername/bdnd",
+        "Bug Reports": "https://github.com/Rookie-Package/bdnd/issues",
+        "Source": "https://github.com/Rookie-Package/bdnd",
+        "Documentation": "https://github.com/Rookie-Package/bdnd#readme",
     },
 )
 
