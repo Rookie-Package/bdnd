@@ -46,4 +46,5 @@ installer/
 *.exe
 !bdnd.exe  # Keep the built executable if needed for testing
 install.bat
+bdnd_logo.ico  # Generated from bdnd_logo.png
 

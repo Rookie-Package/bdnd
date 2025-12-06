@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=45,<77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bdnd"
-version = "1.1.0"
+version = "1.1.1"
 description = "Baidu Netdisk Client - A Python client for Baidu Netdisk API with CLI support"
 readme = "README.md"
 requires-python = ">=3.7"

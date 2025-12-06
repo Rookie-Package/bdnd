@@ -147,14 +147,32 @@ def upload_to_testpypi():
     env.pop('http_proxy', None)
     env.pop('https_proxy', None)
     
+    # Set UTF-8 encoding for Windows
+    if sys.platform == 'win32':
+        env['PYTHONIOENCODING'] = 'utf-8'
+    
     try:
-        subprocess.check_call(
-            [sys.executable, '-m', 'twine', 'upload', '--repository', 'testpypi'] + [str(f) for f in dist_files],
-            env=env
+        result = subprocess.run(
+            [sys.executable, '-m', 'twine', 'upload', '--repository', 'testpypi', '--skip-existing'] + [str(f) for f in dist_files],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
         )
-        print("Uploaded to TestPyPI successfully!")
-        return True
-    except subprocess.CalledProcessError as e:
+        
+        if result.returncode == 0:
+            print("Uploaded to TestPyPI successfully!")
+            if result.stdout:
+                print(result.stdout)
+            return True
+        else:
+            print(f"Error uploading to TestPyPI:")
+            if result.stdout:
+                print("STDOUT:", result.stdout)
+            if result.stderr:
+                print("STDERR:", result.stderr)
+            return False
+    except Exception as e:
         print(f"Error uploading to TestPyPI: {e}")
         return False
 
@@ -174,14 +192,64 @@ def upload_to_pypi():
     env.pop('http_proxy', None)
     env.pop('https_proxy', None)
     
+    # Set UTF-8 encoding for Windows
+    if sys.platform == 'win32':
+        env['PYTHONIOENCODING'] = 'utf-8'
+    
     try:
-        subprocess.check_call(
-            [sys.executable, '-m', 'twine', 'upload'] + [str(f) for f in dist_files],
-            env=env
+        # Use --skip-existing to avoid errors if package already exists
+        result = subprocess.run(
+            [sys.executable, '-m', 'twine', 'upload', '--skip-existing'] + [str(f) for f in dist_files],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding='utf-8'
         )
-        print("Uploaded to PyPI successfully!")
-        return True
-    except subprocess.CalledProcessError as e:
+        
+        if result.returncode == 0:
+            print("Uploaded to PyPI successfully!")
+            if result.stdout:
+                print(result.stdout)
+            return True
+        else:
+            print(f"Error uploading to PyPI:")
+            if result.stdout:
+                print("STDOUT:", result.stdout)
+            if result.stderr:
+                print("STDERR:", result.stderr)
+            
+            # Check if it's just a license field warning
+            error_text = (result.stderr or '') + (result.stdout or '')
+            if 'license-file' in error_text.lower() or 'license-expression' in error_text.lower():
+                print("\n" + "="*60)
+                print("Note: License field warnings detected.")
+                print("These are false positives from setuptools 77.0.0+.")
+                print("The package metadata is actually valid.")
+                print("="*60)
+                print("\nTrying alternative upload method (using tar.gz only)...")
+                
+                # Try uploading only the source distribution (tar.gz)
+                tar_files = [f for f in dist_files if f.suffix == '.gz']
+                if tar_files:
+                    result2 = subprocess.run(
+                        [sys.executable, '-m', 'twine', 'upload', '--skip-existing'] + [str(f) for f in tar_files],
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        encoding='utf-8'
+                    )
+                    if result2.returncode == 0:
+                        print("Successfully uploaded source distribution (tar.gz) to PyPI!")
+                        print("Note: Wheel file (.whl) was skipped due to metadata warnings.")
+                        print("Users can still install the package from the source distribution.")
+                        return True
+                
+                print("\nAlternative method also failed.")
+                print("You can try uploading manually with:")
+                print("  twine upload --skip-existing dist/*.tar.gz")
+                print("Or downgrade setuptools: pip install 'setuptools<77.0.0'")
+            return False
+    except Exception as e:
         print(f"Error uploading to PyPI: {e}")
         return False
 

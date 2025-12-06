@@ -9,6 +9,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 # Disable proxy for all requests in this script
 os.environ.pop('HTTP_PROXY', None)
 os.environ.pop('HTTPS_PROXY', None)
@@ -19,6 +25,7 @@ def check_dependencies():
     """Check if required build tools are installed"""
     required = ['PyInstaller']
     missing = []
+    optional = []
     
     for package in required:
         try:
@@ -29,6 +36,10 @@ def check_dependencies():
                 __import__(package)
         except ImportError:
             missing.append('pyinstaller' if package == 'PyInstaller' else package)
+    
+    # Check optional dependencies
+    if not PIL_AVAILABLE:
+        optional.append('Pillow (for icon conversion)')
     
     if missing:
         print(f"Missing required packages: {', '.join(missing)}")
@@ -67,7 +78,60 @@ def check_dependencies():
                 print("  set HTTPS_PROXY=")
                 print("  pip install " + ' '.join(missing))
                 return False
+    
+    if optional:
+        print(f"\nOptional packages (recommended): {', '.join(optional)}")
+        print("These are not required but enable additional features (e.g., icon conversion)")
+        print("You can install them with: pip install Pillow")
+    
     return True
+
+def convert_png_to_ico():
+    """Convert PNG logo to ICO format for PyInstaller"""
+    png_path = Path('bdnd_logo.png')
+    ico_path = Path('bdnd_logo.ico')
+    
+    if not png_path.exists():
+        print("Warning: bdnd_logo.png not found, skipping icon conversion")
+        return False
+    
+    if not PIL_AVAILABLE:
+        print("Warning: PIL/Pillow not available, cannot convert PNG to ICO")
+        print("Please install Pillow: pip install Pillow")
+        print("Or manually convert bdnd_logo.png to bdnd_logo.ico")
+        if ico_path.exists():
+            print(f"Using existing {ico_path}")
+            return True
+        return False
+    
+    try:
+        print("Converting bdnd_logo.png to bdnd_logo.ico...")
+        img = Image.open(png_path)
+        
+        # Ensure image has alpha channel for transparency
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        
+        # ICO format supports multiple sizes, create common sizes
+        sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+        
+        # Remove old ICO if exists to force regeneration
+        if ico_path.exists():
+            ico_path.unlink()
+        
+        # Save as ICO with all sizes
+        img.save(ico_path, format='ICO', sizes=sizes)
+        print(f"Icon conversion successful! Created {ico_path.absolute()}")
+        print(f"ICO file size: {ico_path.stat().st_size} bytes")
+        return True
+    except Exception as e:
+        print(f"Error converting icon: {e}")
+        import traceback
+        traceback.print_exc()
+        if ico_path.exists():
+            print(f"Using existing {ico_path}")
+            return True
+        return False
 
 def clean_build_dirs():
     """Clean previous build directories"""
@@ -86,10 +150,27 @@ def build_executable():
     """Build Windows executable using PyInstaller"""
     print("Building Windows executable...")
     
+    # Convert PNG to ICO if needed
+    ico_created = convert_png_to_ico()
+    
+    # Check if ICO file exists (either converted or already present)
+    ico_path = Path('bdnd_logo.ico')
+    if not ico_path.exists():
+        print("Warning: bdnd_logo.ico not found. Executable will use default icon.")
+        print("Please ensure bdnd_logo.png exists and Pillow is installed for conversion.")
+    else:
+        print(f"Using icon: {ico_path.absolute()}")
+    
     # Check if spec file exists
     if not os.path.exists('bdnd.spec'):
         print("Error: bdnd.spec file not found!")
         return False
+    
+    # Verify icon path in spec file
+    with open('bdnd.spec', 'r', encoding='utf-8') as f:
+        spec_content = f.read()
+        if 'icon=' not in spec_content or 'bdnd_logo.ico' not in spec_content:
+            print("Warning: Icon not properly configured in bdnd.spec")
     
     # Build using PyInstaller
     cmd = [sys.executable, '-m', 'PyInstaller', 'bdnd.spec', '--clean', '--noconfirm']
@@ -97,6 +178,8 @@ def build_executable():
     try:
         subprocess.check_call(cmd)
         print("Executable built successfully!")
+        if ico_path.exists():
+            print(f"Icon should be applied. If not, verify {ico_path.absolute()} is valid.")
         return True
     except subprocess.CalledProcessError as e:
         print(f"Error building executable: {e}")

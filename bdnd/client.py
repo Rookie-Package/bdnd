@@ -69,6 +69,28 @@ class BaiduNetdiskClient:
             base_path = base_path + "/"
         self.base_path = base_path
     
+    def _sanitize_url(self, url):
+        """Remove sensitive information (like access_token) from URL for logging"""
+        if not url or not isinstance(url, str):
+            return url
+        try:
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+            parsed = urlparse(url)
+            query_params = parse_qs(parsed.query)
+            # Remove access_token from query parameters
+            if 'access_token' in query_params:
+                query_params['access_token'] = ['***REDACTED***']
+            # Rebuild URL without access_token
+            new_query = urlencode(query_params, doseq=True)
+            new_parsed = parsed._replace(query=new_query)
+            return urlunparse(new_parsed)
+        except Exception:
+            # If parsing fails, try simple string replacement
+            import re
+            # Replace access_token=... with access_token=***REDACTED***
+            sanitized = re.sub(r'access_token=[^&]*', 'access_token=***REDACTED***', url)
+            return sanitized
+    
     def _resolve_path(self, path):
         """
         Resolve relative path to absolute path.
@@ -105,8 +127,19 @@ class BaiduNetdiskClient:
         ssl_configs = [{"verify": True}, {"verify": False}]
         
         # Disable proxy to avoid connection issues
+        # Also disable system environment proxy settings
         proxies = {'http': None, 'https': None}
         
+        # Remove any proxy-related environment variables for this request
+        original_env = {}
+        proxy_env_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 
+                         'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy']
+        for var in proxy_env_vars:
+            if var in os.environ:
+                original_env[var] = os.environ[var]
+                del os.environ[var]
+        
+        try:
         for retry in range(max_retries):
             for ssl_config in ssl_configs:
                 try:
@@ -114,21 +147,56 @@ class BaiduNetdiskClient:
                         method,
                         url,
                         timeout=(10, 60),
-                        proxies=proxies,
+                            proxies=proxies,
                         **ssl_config,
                         **kwargs
                     )
                     response.raise_for_status()
                     return response
-                except requests.exceptions.SSLError:
+                    except requests.exceptions.SSLError as e:
                     if ssl_config == ssl_configs[-1] and retry < max_retries - 1:
                         time.sleep(2 ** retry)
                         continue
-                except requests.exceptions.RequestException:
+                        # Last attempt failed
+                        if retry == max_retries - 1:
+                            print(f"Error: SSL connection failed: {e}")
+                            print(f"  URL: {self._sanitize_url(url)}")
+                            print("  Note: Tried with both SSL verification enabled and disabled")
+                    except requests.exceptions.ProxyError as e:
+                        print(f"Error: Proxy connection failed: {e}")
+                        print(f"  URL: {self._sanitize_url(url)}")
+                        print("  Note: Proxy has been disabled, but system may still be using proxy settings")
+                        if retry < max_retries - 1:
+                            time.sleep(2 ** retry)
+                            continue
+                    except requests.exceptions.ConnectionError as e:
+                        print(f"Error: Connection failed: {e}")
+                        print(f"  URL: {self._sanitize_url(url)}")
+                        print("  Possible causes:")
+                        print("    - Network connectivity issue")
+                        print("    - Firewall blocking connection")
+                        print("    - DNS resolution failure")
+                        print("    - Proxy settings interfering")
+                        if retry < max_retries - 1:
+                            time.sleep(2 ** retry)
+                            continue
+                    except requests.exceptions.Timeout as e:
+                        print(f"Error: Request timeout: {e}")
+                        print(f"  URL: {self._sanitize_url(url)}")
+                        if retry < max_retries - 1:
+                            time.sleep(2 ** retry)
+                            continue
+                    except requests.exceptions.RequestException as e:
+                        print(f"Error: Request failed: {e}")
+                        print(f"  URL: {self._sanitize_url(url)}")
                     if retry < max_retries - 1:
                         time.sleep(2 ** retry)
                         continue
                     raise
+        finally:
+            # Restore original environment variables
+            for var, value in original_env.items():
+                os.environ[var] = value
         
         return None
 
@@ -137,13 +205,10 @@ class BaiduNetdiskClient:
         if not self.access_token:
             return None
         url = f"https://pan.baidu.com/rest/2.0/xpan/nas?access_token={self.access_token}&method=uinfo&vip_version=v2"
-        # Disable proxy to avoid connection issues
-        proxies = {'http': None, 'https': None}
-        try:
-            response = requests.get(url, timeout=30, proxies=proxies)
-            response.raise_for_status()
+        headers = {'User-Agent': 'pan.baidu.com'}
+        response = self._safe_request("GET", url, headers=headers, data={}, files={})
+        if response:
             return response.json()
-        except requests.exceptions.RequestException:
             return None
 
     def get_quota(self):
@@ -152,16 +217,12 @@ class BaiduNetdiskClient:
             return None
         url = f"https://pan.baidu.com/api/quota?access_token={self.access_token}&checkfree=1&checkexpire=1"
         headers = {'User-Agent': 'pan.baidu.com'}
-        # Disable proxy to avoid connection issues
-        proxies = {'http': None, 'https': None}
-        try:
-            response = requests.get(url, headers=headers, timeout=30, proxies=proxies)
-            response.raise_for_status()
+        response = self._safe_request("GET", url, headers=headers, data={}, files={})
+        if response:
             return response.json()
-        except requests.exceptions.RequestException:
             return None
 
-    def list_files(self, directory="/apps/autodl", order="time", start=0, limit=100, folder=0, desc=1):
+    def list_files(self, directory="/", order="time", start=0, limit=100, folder=0, desc=1):
         """Get file list"""
         if not self.access_token:
             return None
@@ -180,26 +241,35 @@ class BaiduNetdiskClient:
             f"&desc={desc}"
         )
         headers = {'User-Agent': 'pan.baidu.com'}
-        # Disable proxy to avoid connection issues
-        proxies = {'http': None, 'https': None}
+        response = self._safe_request("GET", url, headers=headers, data={}, files={})
+        if not response:
+            return None
+        
         try:
-            response = requests.request("GET", url, headers=headers, data={}, files={}, timeout=30, proxies=proxies)
-            response.raise_for_status()
             result = response.json()
             # Check for API errors
             if result.get('errno') != 0 and result.get('errno') is not None:
                 errno = result.get('errno')
                 errmsg = result.get('errmsg', 'Unknown error')
-                print(f"Error: List files failed (errno={errno}): {errmsg}")
+                
+                # Handle specific error codes
+                if errno == -6:
+                    # -6 usually means path doesn't exist or no permission
+                    # For root directory, try to suggest a valid path
+                    if directory == "/" or directory == "":
+                        print(f"Error: Cannot access root directory '/' (errno={errno})")
+                        print("Suggestion: Try setting a default path with: bdnd --set-home /apps/autodl")
+                        print("Or use 'cd' command to navigate to a valid directory")
+                    else:
+                        print(f"Error: Cannot access directory '{directory}' (errno={errno}): {errmsg}")
+                else:
+                    print(f"Error: List files failed (errno={errno}): {errmsg}")
                 return None
             # Return list of files
             file_list = result.get('list', [])
             return file_list if file_list else []
-        except requests.exceptions.RequestException as e:
-            print(f"Error: Request failed: {e}")
-            return None
         except Exception as e:
-            print(f"Error: Unexpected error: {e}")
+            print(f"Error: Failed to parse response: {e}")
             return None
 
     def list_all_files_recursive(self, path="/", start=0, limit=1000, web=1, recursion=1):
@@ -395,48 +465,13 @@ class BaiduNetdiskClient:
                 )
                 files = [('file', (file_name, part))]
                 
-                max_retries = 3
-                ssl_configs = [{"verify": True}, {"verify": False}]
-                upload_success = False
-                last_error = None
+                # Use _safe_request for chunk upload
+                resp = self._safe_request("POST", url, headers=headers, data={}, files=files)
                 
-                # Disable proxy to avoid connection issues
-                proxies = {'http': None, 'https': None}
-                
-                for retry in range(max_retries):
-                    for ssl_config in ssl_configs:
-                        try:
-                            resp = requests.request(
-                                "POST", 
-                                url, 
-                                headers=headers, 
-                                data={}, 
-                                files=files,
-                                timeout=(10, 60),
-                                proxies=proxies,
-                                **ssl_config
-                            )
-                            resp.raise_for_status()
-                            upload_success = True
-                            break
-                        except requests.exceptions.SSLError as e:
-                            last_error = f"SSL error: {e}"
-                            if ssl_config == ssl_configs[-1] and retry < max_retries - 1:
-                                time.sleep(2 ** retry)
-                                continue
-                        except requests.exceptions.RequestException as e:
-                            last_error = f"Request error: {e}"
-                            if retry < max_retries - 1:
-                                time.sleep(2 ** retry)
-                                continue
-                    
-                    if upload_success:
-                        break
-                
-                if not upload_success:
+                if not resp:
                     if pbar:
                         pbar.close()
-                    print(f"Error: Failed to upload chunk {idx+1}/{total_blocks}: {last_error}")
+                    print(f"Error: Failed to upload chunk {idx+1}/{total_blocks}")
                     return None
                 
                 part_size = len(part)
@@ -744,7 +779,7 @@ class BaiduNetdiskClient:
             if file_info.get('server_filename') == file_name:
                 return file_info.get('fs_id')
         
-        return None
+            return None
 
     def get_download_url(self, file_path=None, fsid=None):
         """Get download URL (dlink) for file"""
