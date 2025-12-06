@@ -38,9 +38,9 @@ setup(
     install_requires=[
         "requests>=2.25.0",
         "tqdm>=4.60.0",
-        "pandas>=1.2.0",
         "urllib3>=1.26.0",
         "env-key-manager>=0.1.0",
+        "tabulate>=0.9.0",
     ],
     entry_points={
         "console_scripts": [

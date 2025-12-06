@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 from .client import BaiduNetdiskClient
+from .shell import BaiduNetdiskShell
 
 
 def main():
@@ -17,11 +18,86 @@ def main():
         help="Operation mode: 'upload' or 'download'. If not specified, will auto-detect from paths."
     )
     parser.add_argument(
-        'paths', nargs=2,
-        help='Two paths: upload <local> <remote> or download <remote> <local>'
+        "--set-home", "--set_home", type=str, metavar="PATH", default=None,
+        dest="set_home",
+        help="Set default base path for relative paths (saved to environment variable 'baidu_netdisk_base_path')"
+    )
+    parser.add_argument(
+        "--show-home", "--show_home", action="store_true",
+        dest="show_home",
+        help="Show current default base path setting"
+    )
+    parser.add_argument(
+        'paths', nargs='*',
+        help='Two paths: upload <local> <remote> or download <remote> <local>. If not provided, enter interactive mode.'
     )
 
     args = parser.parse_args()
+    
+    # Handle --set-home option
+    if args.set_home is not None:
+        from .config import set_base_path
+        # Normalize path
+        home_path = args.set_home.strip()
+        if not home_path.startswith("/"):
+            home_path = "/" + home_path
+        if home_path != "/" and not home_path.endswith("/"):
+            home_path = home_path + "/"
+        # Save to config file
+        if set_base_path(home_path):
+            print(f"Default base path set to: {home_path}")
+            print("Note: This setting will be used for relative paths in future operations.")
+        else:
+            print("Error: Failed to save configuration")
+            sys.exit(1)
+        return
+    
+    # Handle --show-home option
+    if args.show_home:
+        from .config import get_base_path
+        home_path = get_base_path()
+        if home_path == "/":
+            print("Default base path: / (root)")
+        else:
+            print(f"Default base path: {home_path}")
+        return
+    
+    # If no paths provided, enter interactive mode
+    if len(args.paths) == 0:
+        access_token = args.access_token
+        if not access_token:
+            print("Error: access token must be provided by --access-token or environment variable 'baidu_netdisk_access_token'.")
+            sys.exit(1)
+        
+        client = BaiduNetdiskClient(access_token=access_token)
+        shell = BaiduNetdiskShell(client)
+        shell.run()
+        return
+    
+    # Check if script file is provided
+    if len(args.paths) == 1:
+        script_path = args.paths[0]
+        # Check if it's a .bdnd script file
+        if script_path.endswith('.bdnd') or os.path.exists(script_path):
+            if not os.path.exists(script_path):
+                print(f"Error: Script file '{script_path}' not found")
+                sys.exit(1)
+            
+            access_token = args.access_token
+            if not access_token:
+                print("Error: access token must be provided by --access-token or environment variable 'baidu_netdisk_access_token'.")
+                sys.exit(1)
+            
+            client = BaiduNetdiskClient(access_token=access_token)
+            shell = BaiduNetdiskShell(client)
+            shell.run_script(script_path)
+            return
+    
+    # Original command-line mode requires 2 paths
+    if len(args.paths) != 2:
+        print("Error: Command-line mode requires 2 paths, or use interactive mode by running 'bdnd' without arguments")
+        print("       Or provide a .bdnd script file: bdnd script.bdnd")
+        sys.exit(1)
 
     access_token = args.access_token
     if not access_token:

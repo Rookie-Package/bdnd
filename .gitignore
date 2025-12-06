@@ -40,3 +40,10 @@ env/
 .DS_Store
 Thumbs.db
 
+# Windows Build
+*.spec.bak
+installer/
+*.exe
+!bdnd.exe  # Keep the built executable if needed for testing
+install.bat
+
