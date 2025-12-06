@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bdnd"
-version = "1.0.0"
+version = "1.1.0"
 description = "Baidu Netdisk Client - A Python client for Baidu Netdisk API with CLI support"
 readme = "README.md"
 requires-python = ">=3.7"
+license = {text = "MIT"}
 authors = [
     {name = "Rookie", email = "RookieEmail@163.com"}
 ]
@@ -15,7 +16,6 @@ keywords = ["baidu", "netdisk", "api", "client", "cli", "upload", "download"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.7",

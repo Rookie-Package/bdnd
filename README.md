@@ -209,11 +209,7 @@ MIT License
 
 ## 更新日志
 
-### 1.0.0
-- 初始版本
-- 支持文件上传/下载
-- 支持目录上传/下载
-- CLI工具支持
+### 1.1.0
 - 交互式 Shell 支持
 - 支持常用 Linux 命令（cd, ls, pwd, mkdir, upload, download, mv, cat, head, tail, rcsv, whoami）
 - 支持通配符匹配（*, ?）
@@ -221,4 +217,14 @@ MIT License
 - 支持设置默认工作路径
 - CSV 文件查看和筛选功能
 - 命令自动补全支持
+- 新增 Windows 安装包支持（PyInstaller）
+- 改进代理处理，自动禁用系统代理设置
+- 更新依赖：移除 pandas 和 numpy，添加 tabulate
+
+### 1.0.0
+- 初始版本
+- 支持文件上传/下载
+- 支持目录上传/下载
+- CLI工具支持
+
 

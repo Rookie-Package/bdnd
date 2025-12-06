@@ -13,7 +13,7 @@ def read_readme():
 
 setup(
     name="bdnd",
-    version="1.0.0",
+    version="1.1.0",
     description="Baidu Netdisk Client - A Python client for Baidu Netdisk API with CLI support",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
@@ -35,13 +35,6 @@ setup(
         "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.7",
-    install_requires=[
-        "requests>=2.25.0",
-        "tqdm>=4.60.0",
-        "urllib3>=1.26.0",
-        "env-key-manager>=0.1.0",
-        "tabulate>=0.9.0",
-    ],
     entry_points={
         "console_scripts": [
             "bdnd=bdnd.cli:main",
